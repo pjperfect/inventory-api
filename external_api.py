@@ -18,6 +18,11 @@ def fetch_product_by_barcode(barcode: str) -> dict | None:
     """
     try:
         response = requests.get(f"{BASE_URL}/api/v0/product/{barcode}.json", timeout=5)
+
+        # Guard against empty or non-JSON responses
+        if response.status_code != 200 or not response.content:
+            return None
+
         data = response.json()
 
         # OpenFoodFacts returns status 1 if the product was found
@@ -26,7 +31,10 @@ def fetch_product_by_barcode(barcode: str) -> dict | None:
 
         return _format_product(data["product"])
 
-    except requests.exceptions.RequestException as e:
+    except (
+        requests.exceptions.RequestException,
+        requests.exceptions.JSONDecodeError,
+    ) as e:
         print(f"[external_api] Request failed: {e}")
         return None
 
@@ -49,11 +57,19 @@ def fetch_product_by_name(name: str) -> list[dict]:
             },
             timeout=5,
         )
+
+        # Guard against empty or non-JSON responses
+        if response.status_code != 200 or not response.content:
+            return []
+
         data = response.json()
         products = data.get("products", [])
         return [_format_product(p) for p in products if p.get("product_name")]
 
-    except requests.exceptions.RequestException as e:
+    except (
+        requests.exceptions.RequestException,
+        requests.exceptions.JSONDecodeError,
+    ) as e:
         print(f"[external_api] Request failed: {e}")
         return []
 
@@ -70,8 +86,6 @@ def _format_product(product: dict) -> dict:
         "ingredients_text": product.get("ingredients_text", ""),
         "quantity": product.get("quantity", ""),
         "categories": product.get("categories", ""),
-        # Price and stock are not available from OpenFoodFacts —
-        # these must be set manually when adding to inventory.
         "price": 0.0,
         "stock": 0,
     }
